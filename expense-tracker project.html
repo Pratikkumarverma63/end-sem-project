@@ -1,0 +1,986 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Expense Tracker</title>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+
+  <style>
+   
+    :root {
+      --bg:          #F7F5F2;
+      --surface:     #FFFFFF;
+      --surface2:    #F0EDE8;
+      --border:      #E2DDD7;
+      --text:        #1A1714;
+      --muted:       #7A7268;
+      --muted2:      #B0A89E;
+
+      --inc:         #1A7A50;
+      --inc-bg:      #EBF7F1;
+      --inc-border:  #A8DDBE;
+
+      --exp:         #C0351A;
+      --exp-bg:      #FDF0EC;
+      --exp-border:  #F0B8A8;
+
+      --accent:      #2C5AE8;
+      --accent-bg:   #EEF2FD;
+
+      --radius:      14px;
+      --radius-sm:   8px;
+      --shadow:      0 1px 4px rgba(0,0,0,.07), 0 4px 20px rgba(0,0,0,.05);
+    }
+
+  
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      font-size: 15px;
+      line-height: 1.55;
+    }
+
+
+    .page { max-width: 1060px; margin: 0 auto; padding: 32px 20px 80px; }
+
+    .app-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 28px;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .app-title {
+      font-size: 1.55rem;
+      font-weight: 700;
+      letter-spacing: -.5px;
+    }
+    .app-title span { color: var(--accent); }
+
+
+    .toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+    .filter-tabs { display: flex; gap: 4px; }
+    .ftab {
+      padding: 6px 13px;
+      border: 1.5px solid var(--border);
+      border-radius: 99px;
+      background: none;
+      font-size: .76rem;
+      font-weight: 600;
+      color: var(--muted);
+      cursor: pointer;
+      transition: all .15s;
+      letter-spacing: .02em;
+    }
+    .ftab:hover   { color: var(--text); border-color: var(--muted2); }
+    .ftab.active  { background: var(--accent-bg); color: var(--accent); border-color: var(--accent); }
+
+    .export-btn {
+      padding: 6px 14px;
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--surface);
+      font-size: .76rem;
+      font-weight: 600;
+      color: var(--muted);
+      cursor: pointer;
+      transition: all .15s;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      letter-spacing: .02em;
+    }
+    .export-btn:hover { color: var(--text); border-color: var(--accent); }
+
+ 
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    @media (max-width: 600px) {
+      .summary { grid-template-columns: 1fr; }
+    }
+
+    .summary-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 20px 22px;
+      position: relative;
+      overflow: hidden;
+    }
+    .summary-card::after {         
+      content: '';
+      position: absolute;
+      right: -24px; bottom: -24px;
+      width: 72px; height: 72px;
+      border-radius: 50%;
+      opacity: .1;
+    }
+    .summary-card.balance::after    { background: var(--accent); }
+    .summary-card.income::after     { background: var(--inc); }
+    .summary-card.expenses::after   { background: var(--exp); }
+
+    .sc-label {
+      font-size: .7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .1em;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    .sc-amount {
+      font-size: 1.85rem;
+      font-weight: 700;
+      letter-spacing: -.5px;
+      line-height: 1;
+    }
+    .sc-amount.pos { color: var(--inc); }
+    .sc-amount.neg { color: var(--exp); }
+    .sc-amount.neu { color: var(--text); }
+    .sc-sub { font-size: .75rem; color: var(--muted); margin-top: 5px; }
+
+
+    .main-grid {
+      display: grid;
+      grid-template-columns: 1fr 360px;
+      gap: 20px;
+      align-items: start;
+    }
+    @media (max-width: 800px) {
+      .main-grid { grid-template-columns: 1fr; }
+    }
+
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    .panel-header {
+      padding: 16px 22px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .panel-header h2 { font-size: .95rem; font-weight: 700; }
+    .panel-body { padding: 20px 22px; display: flex; flex-direction: column; gap: 15px; }
+
+ 
+    .type-toggle {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px;
+      background: var(--surface2);
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 4px;
+    }
+    .ttbtn {
+      padding: 9px;
+      border: 1.5px solid transparent;
+      border-radius: 6px;
+      background: transparent;
+      font-size: .82rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all .18s;
+      color: var(--muted);
+    }
+    .ttbtn.on-inc { background: var(--inc-bg); color: var(--inc); border-color: var(--inc-border); }
+    .ttbtn.on-exp { background: var(--exp-bg); color: var(--exp); border-color: var(--exp-border); }
+
+   
+    .field-label {
+      font-size: .71rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .09em;
+      color: var(--muted);
+      display: block;
+      margin-bottom: 6px;
+    }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    @media (max-width: 400px) { .form-row { grid-template-columns: 1fr; } }
+
+    input[type="text"],
+    input[type="number"],
+    input[type="date"],
+    select {
+      width: 100%;
+      padding: 10px 12px;
+      background: var(--bg);
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-family: inherit;
+      font-size: .9rem;
+      color: var(--text);
+      outline: none;
+      transition: border-color .18s, box-shadow .18s;
+      appearance: none;
+      -webkit-appearance: none;
+    }
+    input::placeholder { color: var(--muted2); }
+    input:focus, select:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(44,90,232,.12);
+    }
+    select {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='11' height='11' viewBox='0 0 24 24' fill='none' stroke='%237A7268' stroke-width='2.5'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 11px center;
+      padding-right: 30px;
+    }
+
+   
+    .submit-btn {
+      width: 100%;
+      padding: 12px;
+      border: none;
+      border-radius: var(--radius-sm);
+      font-family: inherit;
+      font-size: .9rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: filter .18s, transform .12s;
+      letter-spacing: .02em;
+    }
+    .submit-btn:hover  { filter: brightness(1.08); }
+    .submit-btn:active { transform: scale(.98); }
+    .submit-btn.inc    { background: var(--inc); color: #fff; }
+    .submit-btn.exp    { background: var(--exp); color: #fff; }
+
+   
+    .tx-list { list-style: none; }
+
+    .tx-item {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      padding: 12px 22px;
+      border-bottom: 1px solid var(--border);
+      transition: background .12s;
+      animation: txSlideIn .22s ease;
+    }
+    .tx-item:last-child { border-bottom: none; }
+    .tx-item:hover      { background: var(--bg); }
+
+    @keyframes txSlideIn {
+      from { opacity: 0; transform: translateY(-6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    
+    .tx-icon {
+      width: 36px; height: 36px;
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 15px;
+      flex-shrink: 0;
+    }
+    .tx-icon.inc { background: var(--inc-bg); border: 1px solid var(--inc-border); }
+    .tx-icon.exp { background: var(--exp-bg); border: 1px solid var(--exp-border); }
+
+    .tx-info { flex: 1; min-width: 0; }
+    .tx-label {
+      font-weight: 600;
+      font-size: .88rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .tx-meta {
+      font-size: .72rem;
+      color: var(--muted);
+      margin-top: 2px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .cat-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      padding: 1px 7px;
+      border-radius: 99px;
+      font-size: .65rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      
+    }
+
+
+    .tx-amount {
+      font-size: .97rem;
+      font-weight: 700;
+      flex-shrink: 0;
+      min-width: 72px;
+      text-align: right;
+    }
+    .tx-amount.inc { color: var(--inc); }
+    .tx-amount.exp { color: var(--exp); }
+
+
+    .del-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--muted2);
+      padding: 4px;
+      border-radius: 6px;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      transition: color .15s, background .15s;
+      line-height: 1;
+    }
+    .del-btn:hover { color: var(--exp); background: var(--exp-bg); }
+
+    .empty-state {
+      text-align: center;
+      padding: 44px 20px;
+      color: var(--muted);
+    }
+    .empty-state .es-icon { font-size: 2rem; margin-bottom: 10px; }
+    .empty-state p        { font-size: .85rem; }
+
+    .count-badge {
+      font-size: .72rem;
+      font-weight: 600;
+      background: var(--surface2);
+      color: var(--muted);
+      border: 1px solid var(--border);
+      padding: 2px 9px;
+      border-radius: 99px;
+    }
+
+    .chart-outer { margin-top: 20px; }
+    .chart-wrap  { position: relative; height: 210px; }
+
+ 
+    .toast {
+      position: fixed;
+      bottom: 24px; left: 50%;
+      transform: translateX(-50%) translateY(80px);
+      background: var(--text);
+      color: #fff;
+      padding: 9px 20px;
+      border-radius: 99px;
+      font-size: .82rem;
+      font-weight: 500;
+      z-index: 9999;
+      pointer-events: none;
+      transition: transform .3s cubic-bezier(.4,0,.2,1);
+      white-space: nowrap;
+    }
+    .toast.visible { transform: translateX(-50%) translateY(0); }
+
+
+    @keyframes shake {
+      0%,100%{ transform: translateX(0); }
+      20%    { transform: translateX(-5px); }
+      40%    { transform: translateX(5px); }
+      60%    { transform: translateX(-4px); }
+      80%    { transform: translateX(4px); }
+    }
+    .shake { animation: shake .3s ease; }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <header class="app-header">
+    <h1 class="app-title">Expense<span>Tracker</span></h1>
+
+    <div class="toolbar">
+ 
+      <div class="filter-tabs">
+        <button class="ftab active" data-filter="all"   onclick="setFilter('all',   this)">All time</button>
+        <button class="ftab"        data-filter="week"  onclick="setFilter('week',  this)">This week</button>
+        <button class="ftab"        data-filter="month" onclick="setFilter('month', this)">This month</button>
+      </div>
+
+      
+      <button class="export-btn" onclick="exportCSV()">
+        <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+          <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+          <polyline points="7 10 12 15 17 10"/>
+          <line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+        Export CSV
+      </button>
+    </div>
+  </header>
+
+  <!-- ── SUMMARY CARDS ─────────────────────────────────────────────
+       Uses reduce() under the hood; see renderSummary() below.
+  ──────────────────────────────────────────────────────────────── -->
+  <section class="summary" aria-label="Financial summary">
+    <div class="summary-card balance">
+      <div class="sc-label">Balance</div>
+      <div class="sc-amount neu" id="sc-balance">₹0.00</div>
+      <div class="sc-sub" id="sc-bal-sub">Income minus expenses</div>
+    </div>
+    <div class="summary-card income">
+      <div class="sc-label">Total Income</div>
+      <div class="sc-amount pos" id="sc-income">₹0.00</div>
+      <div class="sc-sub" id="sc-inc-sub">0 transactions</div>
+    </div>
+    <div class="summary-card expenses">
+      <div class="sc-label">Total Expenses</div>
+      <div class="sc-amount neg" id="sc-expense">₹0.00</div>
+      <div class="sc-sub" id="sc-exp-sub">0 transactions</div>
+    </div>
+  </section>
+
+
+  <div class="main-grid">
+
+  
+    <div>
+      <div class="panel" id="tx-panel">
+        <div class="panel-header">
+          <h2>Transactions</h2>
+          <span class="count-badge" id="tx-count">0</span>
+        </div>
+  
+        <ul class="tx-list" id="tx-list" aria-label="Transaction history"></ul>
+      </div>
+
+
+      <div class="panel chart-outer" id="chart-panel">
+        <div class="panel-header">
+          <h2>Category Breakdown</h2>
+        </div>
+        <div style="padding:18px 22px">
+          <div class="chart-wrap">
+            <canvas id="cat-chart"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="panel">
+        <div class="panel-header">
+          <h2>Add Transaction</h2>
+        </div>
+        <div class="panel-body">
+
+          
+          <div>
+            <span class="field-label">Type</span>
+            <div class="type-toggle">
+              <button class="ttbtn on-inc" id="btn-income"  onclick="setType('income')">＋ Income</button>
+              <button class="ttbtn"        id="btn-expense" onclick="setType('expense')">－ Expense</button>
+            </div>
+          </div>
+
+    
+          <div>
+            <label class="field-label" for="f-label">Label</label>
+            <input type="text" id="f-label" placeholder="e.g. Salary, Grocery run…" />
+          </div>
+
+          <div class="form-row">
+            <div>
+              <label class="field-label" for="f-amount">Amount (₹)</label>
+              <input type="number" id="f-amount" placeholder="0.00" min="0.01" step="0.01" />
+            </div>
+            <div>
+              <label class="field-label" for="f-date">Date</label>
+              <input type="date" id="f-date" />
+            </div>
+          </div>
+
+        
+          <div>
+            <label class="field-label" for="f-category">Category</label>
+            <select id="f-category">
+              <optgroup label="── Income ──">
+                <option value="Salary">💼 Salary</option>
+                <option value="Freelance">💻 Freelance</option>
+                <option value="Investment">📈 Investment</option>
+                <option value="Gift">🎁 Gift</option>
+                <option value="Other Income">💰 Other Income</option>
+              </optgroup>
+              <optgroup label="── Expense ──">
+                <option value="Food">🍜 Food &amp; Dining</option>
+                <option value="Transport">🚌 Transport</option>
+                <option value="Shopping">🛍 Shopping</option>
+                <option value="Health">💊 Health</option>
+                <option value="Entertainment">🎬 Entertainment</option>
+                <option value="Utilities">💡 Utilities</option>
+                <option value="Rent">🏠 Rent</option>
+                <option value="Education">📚 Education</option>
+                <option value="Other Expense">📦 Other</option>
+              </optgroup>
+            </select>
+          </div>
+
+         
+          <button class="submit-btn inc" id="submit-btn" onclick="addTransaction()">
+            Add Income
+          </button>
+
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+
+<!-- ════════════════════════════════════════════════════════════════
+     JAVASCRIPT
+     ════════════════════════════════════════════════════════════════
+     Key concepts demonstrated:
+       • CRUD  ─ addTransaction(), deleteTx(), render()
+       • reduce()  ─ computing totals in renderSummary()
+       • filter() / map()  ─ deriving views in getVisible() / renderList()
+       • JSON.stringify / JSON.parse  ─ in save() and at load time
+       • localStorage  ─ browser as a tiny database
+     ════════════════════════════════════════════════════════════════ -->
+<script>
+
+/* ──────────────────────────────────────────────────────────────────
+   1. STATE
+   One array holds every transaction object.  This is the single
+   source of truth — the UI is always derived from it.
+────────────────────────────────────────────────────────────────── */
+const LS_KEY = 'expense_tracker_v1';  
+
+
+let transactions = JSON.parse(localStorage.getItem(LS_KEY) || '[]');
+
+let currentType  = 'income';   
+let chartInstance = null;      
+let activeFilter = 'all';     
+
+
+/* ──────────────────────────────────────────────────────────────────
+   2. CATEGORY META  (emoji + colour)
+────────────────────────────────────────────────────────────────── */
+const CAT = {
+  Salary:          { emoji: '💼', color: '#1A7A50' },
+  Freelance:       { emoji: '💻', color: '#2C5AE8' },
+  Investment:      { emoji: '📈', color: '#7C3AED' },
+  Gift:            { emoji: '🎁', color: '#DB2777' },
+  'Other Income':  { emoji: '💰', color: '#0E7490' },
+  Food:            { emoji: '🍜', color: '#C0351A' },
+  Transport:       { emoji: '🚌', color: '#1D4ED8' },
+  Shopping:        { emoji: '🛍', color: '#B45309' },
+  Health:          { emoji: '💊', color: '#065F46' },
+  Entertainment:   { emoji: '🎬', color: '#9D174D' },
+  Utilities:       { emoji: '💡', color: '#1E40AF' },
+  Rent:            { emoji: '🏠', color: '#92400E' },
+  Education:       { emoji: '📚', color: '#5B21B6' },
+  'Other Expense': { emoji: '📦', color: '#374151' },
+};
+
+
+/* ──────────────────────────────────────────────────────────────────
+   3. INITIALISE
+────────────────────────────────────────────────────────────────── */
+
+document.getElementById('f-date').value = new Date().toISOString().split('T')[0];
+
+
+render();
+
+
+['f-label','f-amount','f-date'].forEach(id =>
+  document.getElementById(id).addEventListener('keydown', e => {
+    if (e.key === 'Enter') addTransaction();
+  })
+);
+
+
+/* ──────────────────────────────────────────────────────────────────
+   4. TYPE TOGGLE  (Income ↔ Expense)
+────────────────────────────────────────────────────────────────── */
+function setType(type) {
+  currentType = type;
+  const btnInc = document.getElementById('btn-income');
+  const btnExp = document.getElementById('btn-expense');
+  const sub    = document.getElementById('submit-btn');
+
+  if (type === 'income') {
+    btnInc.className = 'ttbtn on-inc';
+    btnExp.className = 'ttbtn';
+    sub.className    = 'submit-btn inc';
+    sub.textContent  = 'Add Income';
+  } else {
+    btnExp.className = 'ttbtn on-exp';
+    btnInc.className = 'ttbtn';
+    sub.className    = 'submit-btn exp';
+    sub.textContent  = 'Add Expense';
+  }
+}
+
+
+/* ──────────────────────────────────────────────────────────────────
+   5. DATE FILTER  (stretch goal)
+────────────────────────────────────────────────────────────────── */
+function setFilter(f, btn) {
+  activeFilter = f;
+  document.querySelectorAll('.ftab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  render();   
+}
+
+/**
+ * getVisible()
+ * Uses filter() to return only the transactions that fall within
+ * the selected date window.
+ */
+function getVisible() {
+  if (activeFilter === 'all') return transactions;
+
+  const now   = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  if (activeFilter === 'week') {
+  
+    const weekStart = new Date(today);
+    weekStart.setDate(today.getDate() - today.getDay());
+    return transactions.filter(t => new Date(t.date) >= weekStart);
+  }
+
+  if (activeFilter === 'month') {
+    return transactions.filter(t => {
+      const d = new Date(t.date);
+      return d.getMonth() === now.getMonth() &&
+             d.getFullYear() === now.getFullYear();
+    });
+  }
+
+  return transactions;
+}
+
+
+/* ──────────────────────────────────────────────────────────────────
+   6. CREATE  —  addTransaction()
+────────────────────────────────────────────────────────────────── */
+function addTransaction() {
+
+  const label    = document.getElementById('f-label').value.trim();
+  const amount   = parseFloat(document.getElementById('f-amount').value);
+  const date     = document.getElementById('f-date').value;
+  const category = document.getElementById('f-category').value;
+
+
+  if (!label || isNaN(amount) || amount <= 0 || !date) {
+    const btn = document.getElementById('submit-btn');
+    btn.classList.remove('shake');
+    
+    void btn.offsetWidth;
+    btn.classList.add('shake');
+    toast('Please fill in every field correctly.');
+    return;
+  }
+
+  
+  const tx = {
+    id:       Date.now(),    
+    label,
+    amount,
+    date,
+    category,
+    type:     currentType,   
+  };
+
+
+  transactions.unshift(tx);
+
+
+  save();
+  render();
+
+
+  document.getElementById('f-label').value  = '';
+  document.getElementById('f-amount').value = '';
+
+  toast(`${currentType === 'income' ? 'Income' : 'Expense'} added!`);
+}
+
+
+/* ──────────────────────────────────────────────────────────────────
+   7. DELETE  —  deleteTx()
+────────────────────────────────────────────────────────────────── */
+
+function deleteTx(id) {
+  transactions = transactions.filter(t => t.id !== id);
+  save();
+  render();
+  toast('Transaction deleted.');
+}
+
+
+
+/**
+ * JSON.stringify converts the JS array into a plain string so
+ * localStorage can store it.  Called after every mutation.
+ */
+function save() {
+  localStorage.setItem(LS_KEY, JSON.stringify(transactions));
+}
+
+
+/* ──────────────────────────────────────────────────────────────────
+   9. RENDER PIPELINE
+   render() calls three sub-functions so each concern is separate.
+────────────────────────────────────────────────────────────────── */
+function render() {
+  const visible = getVisible();  
+  renderSummary(visible);
+  renderList(visible);
+  renderChart(visible);
+}
+
+
+/* ── 9a. renderSummary ─────────────────────────────────────────────
+   Demonstrates reduce() to compute totals from an array.
+────────────────────────────────────────────────────────────────── */
+function renderSummary(visible) {
+ 
+  const totalIncome  = visible
+    .filter(t => t.type === 'income')
+    .reduce((sum, t) => sum + t.amount, 0);   
+
+  const totalExpense = visible
+    .filter(t => t.type === 'expense')
+    .reduce((sum, t) => sum + t.amount, 0);
+
+  const balance = totalIncome - totalExpense;
+
+ 
+  const balEl = document.getElementById('sc-balance');
+  balEl.textContent = fmt(balance);
+  balEl.className   = 'sc-amount ' + (balance > 0 ? 'pos' : balance < 0 ? 'neg' : 'neu');
+
+  document.getElementById('sc-income').textContent  = fmt(totalIncome);
+  document.getElementById('sc-expense').textContent = fmt(totalExpense);
+
+  const incCount = visible.filter(t => t.type === 'income').length;
+  const expCount = visible.filter(t => t.type === 'expense').length;
+  document.getElementById('sc-inc-sub').textContent = incCount + ' transaction' + (incCount !== 1 ? 's' : '');
+  document.getElementById('sc-exp-sub').textContent = expCount + ' transaction' + (expCount !== 1 ? 's' : '');
+  document.getElementById('sc-bal-sub').textContent =
+    balance >= 0 ? 'You are on track 👍' : 'Expenses exceed income';
+}
+
+
+/* ── 9b. renderList ────────────────────────────────────────────────
+   Demonstrates map() to convert data objects into HTML strings.
+────────────────────────────────────────────────────────────────── */
+function renderList(visible) {
+  const list = document.getElementById('tx-list');
+  document.getElementById('tx-count').textContent = visible.length;
+
+  
+  if (visible.length === 0) {
+    list.innerHTML = `
+      <li class="empty-state">
+        <div class="es-icon">💳</div>
+        <p>No transactions found.<br>Add your first one!</p>
+      </li>`;
+    return;
+  }
+
+  
+  list.innerHTML = visible.map(t => {
+    const meta  = CAT[t.category] || { emoji: '📦', color: '#374151' };
+    const dateStr = new Date(t.date).toLocaleDateString('en-IN', {
+      day: 'numeric', month: 'short', year: 'numeric'
+    });
+    const sign    = t.type === 'income' ? '+' : '−';
+    const bgColor = meta.color + '18';  
+
+    return `
+      <li class="tx-item">
+        <div class="tx-icon ${t.type}">${meta.emoji}</div>
+        <div class="tx-info">
+          <div class="tx-label">${escHtml(t.label)}</div>
+          <div class="tx-meta">
+            <span>${dateStr}</span>
+            <span class="cat-badge"
+              style="background:${bgColor}; color:${meta.color}; border:1px solid ${meta.color}38">
+              ${t.category}
+            </span>
+          </div>
+        </div>
+        <div class="tx-amount ${t.type}">${sign}${fmt(t.amount)}</div>
+        <button class="del-btn" onclick="deleteTx(${t.id})" title="Delete transaction"
+          aria-label="Delete ${escHtml(t.label)}">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <polyline points="3 6 5 6 21 6"/>
+            <path d="M19 6l-1 14H6L5 6"/>
+            <path d="M10 11v6M14 11v6"/>
+            <path d="M9 6V4h6v2"/>
+          </svg>
+        </button>
+      </li>`;
+  }).join('');
+}
+
+
+/* ── 9c. renderChart ───────────────────────────────────────────────
+   Stretch goal: doughnut chart of expense categories (Chart.js).
+   Uses reduce() to group amounts by category.
+────────────────────────────────────────────────────────────────── */
+function renderChart(visible) {
+  const ctx = document.getElementById('cat-chart').getContext('2d');
+
+  
+  const expenseOnly = visible.filter(t => t.type === 'expense');
+
+  const grouped = expenseOnly.reduce((acc, t) => {
+    acc[t.category] = (acc[t.category] || 0) + t.amount;
+    return acc;
+  }, {});  
+  const labels = Object.keys(grouped);
+  const data   = Object.values(grouped);
+  const colors = labels.map(l => (CAT[l] || { color: '#94A3B8' }).color);
+
+
+  if (chartInstance) chartInstance.destroy();
+
+  if (labels.length === 0) {
+
+    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+    ctx.fillStyle    = '#B0A89E';
+    ctx.font         = '13px system-ui, sans-serif';
+    ctx.textAlign    = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('No expense data for this period', ctx.canvas.width / 2, 105);
+    return;
+  }
+
+  chartInstance = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels,
+      datasets: [{
+        data,
+        backgroundColor: colors.map(c => c + 'CC'),   
+        borderColor:     colors,
+        borderWidth:     1.5,
+        hoverOffset:     8,
+      }]
+    },
+    options: {
+      responsive:          true,
+      maintainAspectRatio: false,
+      cutout:              '65%',
+      plugins: {
+        legend: {
+          position: 'right',
+          labels: {
+            font:      { family: 'system-ui', size: 11 },
+            color:     '#7A7268',
+            boxWidth:  10,
+            boxHeight: 10,
+            padding:   10,
+         
+            generateLabels: chart => {
+              const ds    = chart.data.datasets[0];
+              const total = ds.data.reduce((a, b) => a + b, 0);
+              return chart.data.labels.map((lbl, i) => ({
+                text:        `${lbl}  ${Math.round(ds.data[i] / total * 100)}%`,
+                fillStyle:   ds.backgroundColor[i],
+                strokeStyle: ds.borderColor[i],
+                lineWidth:   1,
+                hidden:      false,
+                index:       i,
+              }));
+            }
+          }
+        },
+        tooltip: {
+          callbacks: {
+            label: ctx => `  ₹${ctx.parsed.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
+          }
+        }
+      }
+    }
+  });
+}
+
+
+/* ──────────────────────────────────────────────────────────────────
+   10. EXPORT CSV  (stretch goal)
+   Uses map() to convert each transaction into a CSV row string.
+────────────────────────────────────────────────────────────────── */
+function exportCSV() {
+  const visible = getVisible();
+  if (visible.length === 0) { toast('Nothing to export.'); return; }
+
+  const header = ['Date', 'Label', 'Type', 'Category', 'Amount'];
+  const rows   = visible.map(t =>
+    [t.date, `"${t.label.replace(/"/g, '""')}"`, t.type, t.category, t.amount]
+  );
+
+  const csv = [header, ...rows].map(r => r.join(',')).join('\n');
+  const url = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+
+  const a      = document.createElement('a');
+  a.href       = url;
+  a.download   = 'transactions.csv';
+  a.click();
+
+  toast('CSV downloaded!');
+}
+
+
+/* ──────────────────────────────────────────────────────────────────
+   11. HELPERS
+────────────────────────────────────────────────────────────────── */
+
+
+function fmt(n) {
+  return '₹' + Math.abs(n).toLocaleString('en-IN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+}
+
+
+function escHtml(s) {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('visible');
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.remove('visible'), 2500);
+}
+
+</script>
+</body>
+</html>
